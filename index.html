@@ -1,137 +1,64 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EIGOO Management</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-</head>
-<body class="bg-gray-100">
-
-<div id="loginPage" class="flex items-center justify-center h-screen">
-  <div class="bg-white p-8 rounded shadow-md w-96">
-    <h2 class="text-2xl font-bold mb-6 text-center">EIGOO Management</h2>
-    <input id="email" type="email" placeholder="Email" class="w-full p-2 mb-3 border rounded">
-    <input id="password" type="password" placeholder="Mật khẩu" class="w-full p-2 mb-4 border rounded">
-    <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Đăng nhập</button>
-  </div>
-</div>
-
-<div id="app" class="hidden flex">
-  <div class="w-64 bg-white h-screen shadow p-4">
-    <h1 class="text-xl font-bold mb-6">EIGOO</h1>
-    <button onclick="showPage('products')" class="block w-full text-left mb-3">Sản phẩm</button>
-  </div>
-
-  <div class="flex-1 p-6">
-
-    <div id="productsPage">
-      <h2 class="text-2xl font-bold mb-4">Quản lý sản phẩm</h2>
-
-      <div class="bg-white p-4 rounded shadow mb-6">
-        <input id="productName" placeholder="Tên sản phẩm" class="border p-2 mr-2">
-        <input id="category" placeholder="Loại sản phẩm" class="border p-2 mr-2">
-        <button onclick="addProduct()" class="bg-green-600 text-white p-2 rounded">Thêm sản phẩm</button>
-      </div>
-
-      <div id="productList"></div>
-    </div>
-
-  </div>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyB1xJGbiOW89fzdpfZtN5vTqPbBQOGaG-w",
-  authDomain: "eigoo-81a82.firebaseapp.com",
-  projectId: "eigoo-81a82"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-window.login = async function(){
-  await signInWithEmailAndPassword(auth,
-    document.getElementById("email").value,
-    document.getElementById("password").value
-  );
-};
-
-onAuthStateChanged(auth,user=>{
-  if(user){
-    document.getElementById("loginPage").style.display="none";
-    document.getElementById("app").classList.remove("hidden");
-    loadProducts();
-  }
-});
-
-function generateProductCode(number){
-  return "EIG-" + String(number).padStart(4,"0");
-}
-
-function generateSKU(base,color){
-  return base + "-" + color.toUpperCase();
-}
-
-window.addProduct = async function(){
-  const name=document.getElementById("productName").value;
-  const category=document.getElementById("category").value;
-
-  const snapshot = await getDocs(collection(db,"products"));
-  const code = generateProductCode(snapshot.size+1);
-
-  await addDoc(collection(db,"products"),{
-    name,category,code
-  });
-
-  alert("Đã thêm sản phẩm: "+code);
-  loadProducts();
-};
-
-window.addVariant = async function(productId,baseCode){
-  const color=prompt("Nhập màu:");
-  const importPrice=Number(prompt("Giá nhập:"));
-  const salePrice=Number(prompt("Giá bán:"));
-  const stock=Number(prompt("Tồn kho ban đầu:"));
-
-  const sku=generateSKU(baseCode,color);
-
-  await addDoc(collection(db,"variants"),{
-    productId,color,importPrice,salePrice,stock,sku
-  });
-
-  alert("Đã thêm biến thể "+sku);
-  loadProducts();
-};
-
 async function loadProducts(){
-  const snapshot=await getDocs(query(collection(db,"products"),orderBy("code")));
+  const productSnapshot = await getDocs(query(collection(db,"products"),orderBy("code")));
+  const variantSnapshot = await getDocs(collection(db,"variants"));
+
   let html="";
 
-  for(const doc of snapshot.docs){
+  for(const productDoc of productSnapshot.docs){
+
+    let totalStock=0;
+    let variantHTML="";
+
+    for(const variantDoc of variantSnapshot.docs){
+      const v=variantDoc.data();
+
+      if(v.productId===productDoc.id){
+        totalStock+=Number(v.stock);
+
+        variantHTML+=`
+          <tr>
+            <td class="border p-1">${v.sku}</td>
+            <td class="border p-1">${v.color}</td>
+            <td class="border p-1">${v.importPrice}</td>
+            <td class="border p-1">${v.salePrice}</td>
+            <td class="border p-1 font-bold">${v.stock}</td>
+          </tr>
+        `;
+      }
+    }
+
     html+=`
-      <div class="bg-white p-4 rounded shadow mb-4">
-        <h3 class="font-bold">${doc.data().name} (${doc.data().code})</h3>
-        <button onclick="addVariant('${doc.id}','${doc.data().code}')" 
-          class="bg-blue-500 text-white px-3 py-1 rounded mt-2">
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <h3 class="font-bold text-lg">
+          ${productDoc.data().name} (${productDoc.data().code})
+        </h3>
+
+        <p class="text-sm text-gray-600 mb-2">
+          Tổng tồn kho: <span class="font-bold">${totalStock}</span>
+        </p>
+
+        <button onclick="addVariant('${productDoc.id}','${productDoc.data().code}')" 
+          class="bg-blue-500 text-white px-3 py-1 rounded mb-3">
           Thêm biến thể
         </button>
+
+        <table class="w-full border text-sm">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="border p-1">SKU</th>
+              <th class="border p-1">Màu</th>
+              <th class="border p-1">Giá nhập</th>
+              <th class="border p-1">Giá bán</th>
+              <th class="border p-1">Tồn</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${variantHTML || `<tr><td colspan="5" class="text-center p-2 text-gray-400">Chưa có biến thể</td></tr>`}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
   document.getElementById("productList").innerHTML=html;
 }
-
-window.showPage=function(){};
-</script>
-
-</body>
-</html>
