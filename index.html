@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIGOO Management</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.sidebar { width: 240px; }
+</style>
+</head>
+
+<body class="bg-gray-100">
+
+<!-- LOGIN -->
+<div id="loginPage" class="flex items-center justify-center h-screen">
+  <div class="bg-white p-8 rounded shadow-md w-96">
+    <h2 class="text-2xl font-bold mb-6 text-center">EIGOO Management</h2>
+    <input id="email" type="email" placeholder="Email" class="w-full p-2 mb-3 border rounded">
+    <input id="password" type="password" placeholder="Mật khẩu" class="w-full p-2 mb-4 border rounded">
+    <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Đăng nhập</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden flex">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar bg-white h-screen shadow p-4">
+    <h1 class="text-xl font-bold mb-6">EIGOO</h1>
+    <ul class="space-y-3">
+      <li><button onclick="showPage('dashboard')" class="w-full text-left">Dashboard</button></li>
+      <li><button onclick="showPage('products')" class="w-full text-left">Sản phẩm</button></li>
+    </ul>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="flex-1 p-6">
+
+    <!-- DASHBOARD -->
+    <div id="dashboardPage">
+      <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+
+      <div class="grid grid-cols-3 gap-6">
+        <div class="bg-white p-4 rounded shadow">
+          <p>Doanh thu tháng</p>
+          <h3 class="text-xl font-bold">0 đ</h3>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <p>Sản phẩm bán tháng</p>
+          <h3 class="text-xl font-bold">0</h3>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <p>Lợi nhuận tháng</p>
+          <h3 class="text-xl font-bold">0 đ</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div id="productsPage" class="hidden">
+      <h2 class="text-2xl font-bold mb-4">Quản lý sản phẩm</h2>
+
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <input id="productName" placeholder="Tên sản phẩm" class="border p-2 mr-2">
+        <input id="category" placeholder="Loại sản phẩm (ví dụ: Gấu bông)" class="border p-2 mr-2">
+        <button onclick="addProduct()" class="bg-green-600 text-white p-2 rounded">Thêm sản phẩm</button>
+      </div>
+
+      <div class="bg-white p-4 rounded shadow">
+        <table class="w-full border">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border p-2">Tên</th>
+              <th class="border p-2">Loại</th>
+              <th class="border p-2">Biến thể</th>
+            </tr>
+          </thead>
+          <tbody id="productList"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB1xJGbiOW89fzdpfZtN5vTqPbBQOGaG-w",
+  authDomain: "eigoo-81a82.firebaseapp.com",
+  projectId: "eigoo-81a82",
+  storageBucket: "eigoo-81a82.firebasestorage.app",
+  messagingSenderId: "296871373378",
+  appId: "1:296871373378:web:890403f45419de05915bdb"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+window.login = async function() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  await signInWithEmailAndPassword(auth, email, password);
+};
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    document.getElementById("loginPage").style.display="none";
+    document.getElementById("app").classList.remove("hidden");
+    loadProducts();
+  }
+});
+
+window.showPage = function(page){
+  document.getElementById("dashboardPage").classList.add("hidden");
+  document.getElementById("productsPage").classList.add("hidden");
+  document.getElementById(page+"Page").classList.remove("hidden");
+}
+
+window.addProduct = async function(){
+  const name = document.getElementById("productName").value;
+  const category = document.getElementById("category").value;
+
+  await addDoc(collection(db,"products"),{
+    name,
+    category,
+    createdAt:new Date()
+  });
+
+  alert("Đã thêm sản phẩm!");
+  loadProducts();
+}
+
+async function loadProducts(){
+  const snapshot = await getDocs(collection(db,"products"));
+  let html="";
+  snapshot.forEach(doc=>{
+    html+=`
+      <tr>
+        <td class="border p-2">${doc.data().name}</td>
+        <td class="border p-2">${doc.data().category}</td>
+        <td class="border p-2">Chưa có</td>
+      </tr>
+    `;
+  });
+  document.getElementById("productList").innerHTML=html;
+}
+</script>
+
+</body>
+</html>
